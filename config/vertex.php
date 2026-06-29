@@ -6,7 +6,7 @@ return [
 
     'location' => env('GOOGLE_CLOUD_LOCATION', 'asia-southeast1'),
 
-    'model' => env('VERTEX_AI_GEMINI_MODEL', 'gemini-1.5-flash'),
+    'model' => env('VERTEX_AI_GEMINI_MODEL', 'gemini-2.5-flash'),
 
     'credentials_path' => env('GOOGLE_APPLICATION_CREDENTIALS'),
 
