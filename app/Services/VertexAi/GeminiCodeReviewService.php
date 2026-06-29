@@ -39,6 +39,13 @@ class GeminiCodeReviewService
             $model,
         );
 
+        \Illuminate\Support\Facades\Log::error('DEBUG_URL_CONSTRUCTION', [
+            'location' => $location,
+            'projectId' => $projectId,
+            'model' => $model,
+            'full_endpoint' => $endpoint
+        ]);
+
         $response = Http::withToken($accessToken)
             ->timeout(120)
             ->post($endpoint, [
