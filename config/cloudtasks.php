@@ -4,7 +4,7 @@ return [
 
     'project_id' => env('GOOGLE_CLOUD_PROJECT'),
 
-    'location' => env('GOOGLE_CLOUD_LOCATION', 'us-central1'),
+    'location' => env('GOOGLE_CLOUD_LOCATION', 'asia-southeast1'),
 
     'queue' => env('CLOUD_TASKS_QUEUE', 'codereviewer-jobs'),
 
