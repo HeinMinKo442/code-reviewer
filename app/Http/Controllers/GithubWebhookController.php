@@ -25,48 +25,57 @@ class GithubWebhookController extends Controller
      */
     public function handle(Request $request): JsonResponse
     {
-        \Illuminate\Support\Facades\Log::info('Webhook received', ['action' => $request->input('action')]);
+        try {
+            \Illuminate\Support\Facades\Log::info('Webhook received', ['action' => $request->input('action')]);
 
-        if ($request->header('X-GitHub-Event') !== self::PULL_REQUEST_EVENT) {
-            return response()->json(['status' => 'ignored_event'], Response::HTTP_OK);
+            if ($request->header('X-GitHub-Event') !== self::PULL_REQUEST_EVENT) {
+                return response()->json(['status' => 'ignored_event'], Response::HTTP_OK);
+            }
+
+            $payload = $request->json()->all();
+            $action = $payload['action'] ?? null;
+
+            if (!in_array($action, ['opened', 'labeled', 'synchronize'])) {
+                return response()->json(['status' => 'ignored_action', 'action' => $action], Response::HTTP_OK);
+            }
+
+            if (!$this->hasAiReviewLabel($payload)) {
+                \Illuminate\Support\Facades\Log::info('Ignored because ai-review label is missing.', [
+                    'current_labels' => $payload['pull_request']['labels'] ?? []
+                ]);
+                return response()->json(['status' => 'ignored_missing_label'], Response::HTTP_OK);
+            }
+
+            $repository = $payload['repository'] ?? null;
+            $pullRequestNumber = $payload['number'] ?? $payload['pull_request']['number'] ?? null;
+            $repositoryFullName = is_array($repository) ? ($repository['full_name'] ?? null) : null;
+
+            if (! is_array($repository) || ! is_int($pullRequestNumber) || ! is_string($repositoryFullName)) {
+                return response()->json(['message' => 'Invalid pull request payload.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            if (! $this->allowedRepositoryService->isAllowed($repositoryFullName)) {
+                \Illuminate\Support\Facades\Log::warning('Ignored not allowed repo: ' . $repositoryFullName);
+                return response()->json(['status' => 'ignored_not_allowed_repo', 'repo' => $repositoryFullName], Response::HTTP_OK);
+            }
+
+            \Illuminate\Support\Facades\Log::info('Dispatching AI Review Job', ['repo' => $repositoryFullName, 'pr' => $pullRequestNumber]);
+
+            ProcessGithubPullRequestJob::dispatchSync(
+                $repositoryFullName,
+                $pullRequestNumber,
+                $repository,
+            );
+
+            return response()->json(['status' => 'review_triggered'], Response::HTTP_ACCEPTED);
+        } catch(\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
         }
-
-        $payload = $request->json()->all();
-        $action = $payload['action'] ?? null;
-
-        if (!in_array($action, ['opened', 'labeled', 'synchronize'])) {
-            return response()->json(['status' => 'ignored_action', 'action' => $action], Response::HTTP_OK);
-        }
-
-        if (!$this->hasAiReviewLabel($payload)) {
-            \Illuminate\Support\Facades\Log::info('Ignored because ai-review label is missing.', [
-                'current_labels' => $payload['pull_request']['labels'] ?? []
-            ]);
-            return response()->json(['status' => 'ignored_missing_label'], Response::HTTP_OK);
-        }
-
-        $repository = $payload['repository'] ?? null;
-        $pullRequestNumber = $payload['number'] ?? $payload['pull_request']['number'] ?? null;
-        $repositoryFullName = is_array($repository) ? ($repository['full_name'] ?? null) : null;
-
-        if (! is_array($repository) || ! is_int($pullRequestNumber) || ! is_string($repositoryFullName)) {
-            return response()->json(['message' => 'Invalid pull request payload.'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        if (! $this->allowedRepositoryService->isAllowed($repositoryFullName)) {
-            \Illuminate\Support\Facades\Log::warning('Ignored not allowed repo: ' . $repositoryFullName);
-            return response()->json(['status' => 'ignored_not_allowed_repo', 'repo' => $repositoryFullName], Response::HTTP_OK);
-        }
-
-        \Illuminate\Support\Facades\Log::info('Dispatching AI Review Job', ['repo' => $repositoryFullName, 'pr' => $pullRequestNumber]);
-
-        ProcessGithubPullRequestJob::dispatchSync(
-            $repositoryFullName,
-            $pullRequestNumber,
-            $repository,
-        );
-
-        return response()->json(['status' => 'review_triggered'], Response::HTTP_ACCEPTED);
     }
     
     /**
