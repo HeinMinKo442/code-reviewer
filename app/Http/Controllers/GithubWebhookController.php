@@ -14,8 +14,6 @@ class GithubWebhookController extends Controller
 
     private const PULL_REQUEST_EVENT = 'pull_request';
 
-    private const LABELED_ACTION = 'labeled';
-
     public function __construct(
         private readonly AllowedRepositoryService $allowedRepositoryService,
     ) {}
@@ -59,9 +57,10 @@ class GithubWebhookController extends Controller
                 return response()->json(['status' => 'ignored_not_allowed_repo', 'repo' => $repositoryFullName], Response::HTTP_OK);
             }
 
-            \Illuminate\Support\Facades\Log::info('Dispatching AI Review Job', ['repo' => $repositoryFullName, 'pr' => $pullRequestNumber]);
+            \Illuminate\Support\Facades\Log::info('Dispatching AI Review Job to Queue', ['repo' => $repositoryFullName, 'pr' => $pullRequestNumber]);
 
-            ProcessGithubPullRequestJob::dispatchSync(
+            // ပြင်ဆင်လိုက်သည့်နေရာ: dispatchSync မှ dispatch သို့ ပြောင်းလဲခြင်း
+            ProcessGithubPullRequestJob::dispatch(
                 $repositoryFullName,
                 $pullRequestNumber,
                 $repository,
