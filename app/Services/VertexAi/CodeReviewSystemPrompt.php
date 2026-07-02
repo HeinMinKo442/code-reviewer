@@ -2,12 +2,38 @@
 
 namespace App\Services\VertexAi;
 
+use App\Services\File\CodeReviewRulesFileService;
+use Illuminate\Support\Facades\Log;
+
 class CodeReviewSystemPrompt
 {
+    public function __construct(
+        private readonly CodeReviewRulesFileService $rulesFileService,
+    ) {}
+
     /**
      * Build the system instruction for Gemini code review.
+     *
+     * Loads project rule markdown from storage when available; otherwise uses the hardcoded fallback only.
      */
-    public static function build(): string
+    public function build(): string
+    {
+        $basePrompt = self::fallbackPrompt();
+        $combinedRules = $this->rulesFileService->loadCombinedRules();
+
+        if ($combinedRules === '') {
+            Log::warning('No code review rule files could be loaded; using hardcoded fallback system prompt.');
+
+            return $basePrompt;
+        }
+
+        return $basePrompt."\n\n## Project-specific coding standards and review rules\n\n".$combinedRules;
+    }
+
+    /**
+     * Hardcoded system prompt used when rule files are missing or unreadable.
+     */
+    private static function fallbackPrompt(): string
     {
         return <<<'PROMPT'
 You are an elite senior software engineer performing automated pull request code review.
