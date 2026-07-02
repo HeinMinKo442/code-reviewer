@@ -9,6 +9,10 @@ use RuntimeException;
 
 class GeminiCodeReviewService
 {
+    public function __construct(
+        private readonly CodeReviewSystemPrompt $systemPrompt,
+    ) {}
+
     /**
      * Send a formatted pull request diff to Gemini and return structured review comments.
      *
@@ -51,7 +55,7 @@ class GeminiCodeReviewService
             ->post($endpoint, [
                 'systemInstruction' => [
                     'parts' => [
-                        ['text' => CodeReviewSystemPrompt::build()],
+                        ['text' => $this->systemPrompt->build()],
                     ],
                 ],
                 'contents' => [

@@ -38,6 +38,14 @@ return [
             'report' => false,
         ],
 
+        // WHY: Code review rule markdown files live at storage/app/*.md (image-baked, read-only on Cloud Run).
+        'review_rules' => [
+            'driver' => 'local',
+            'root' => storage_path('app'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
